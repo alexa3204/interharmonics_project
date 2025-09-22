@@ -1,0 +1,71 @@
+function pos_seq = positive_sequence(Va, Vb, Vc, f, t)
+% POSITIVE_SEQUENCE calculate positive sequence phasor from three-phase
+% waveforms
+
+% Inputs:
+% Va, Vb, Vc - waveforms for phase A, B, and C (same length as t)
+% f - fundamnetal frequency in Hz
+% t - time vector corresponding to the waveforms
+
+% Output:
+% pos_seq = positive sequence phasor (complex number)
+
+% Theory:
+% The positive sequence is calculated using symmetrical components:
+% V1 = (1/3)[Va + a * Vb + a^2 * Vc]
+% where a = e^(j2*pi/3) is the 120 degree complex operator
+
+% Example:
+%   t = 0:0.0001:1/60;  % One cycle at 60 Hz
+%   Va = 100*cos(2*pi*60*t);
+%   Vb = 100*cos(2*pi*60*t - 2*pi/3);
+%   Vc = 100*cos(2*pi*60*t + 2*pi/3);
+%   V_pos = calculate_positive_sequence_phasor(Va, Vb, Vc, 60, t);
+
+% Validate inputs
+if length(Va) ~= length(Vb) || length(Vb) ~= length(Vc) || length(Vc) ~= length(t)
+    error('All input vectors must have the same length');
+end
+
+if f <= 0
+    error('Frequency must be positive');
+end
+
+% Define the complex operator 'a' for 120° phase shift
+a = exp(1j * 2 * pi / 3);  % a = e^(j2π/3)
+
+Va_phasor = extract_phasor_rms(Va, f, t);
+Vb_phasor = extract_phasor_rms(Vb, f, t);
+Vc_phasor = extract_phasor_rms(Vc, f, t);
+
+% Calculate positive sequence using symmetrical components transformation
+V_pos = (1/3) * (Va_phasor + a * Vb_phasor + a^2 * Vc_phasor);
+
+end
+
+function phasor = extract_phasor_rms(signal,f, t)
+% Extract phasor using RMS and phase detection 
+
+% Step 1: calculate RMS value for the magnitude 
+rms_value = sqrt(mean(signal.^2))
+
+% Step 2: find phase using correlation method
+% create reference signals 
+cos_ref = cos(2*pi*f*t); 
+sin_ref = sin(2*pi*f*t); 
+
+% Calculate correlations 
+cos_corr = mean(signal .* cos_ref) * 2; 
+sin_corr = mean(signal .* sin_ref) * 2;
+
+% The signal can be written as: signal = A*cos(2πft + φ)
+% This expands to: A*cos(φ)*cos(2πft) - A*sin(φ)*sin(2πft)
+% So: cos_corr = A*cos(φ), sin_corr = -A*sin(φ)
+
+magnitude = sqrt(cos_corr^2 + sin_corr^2);
+phase_rad = atan2(-sin_corr, cos_corr);
+
+% Create phasor
+phasor = magnitude * exp(1j * phase_rad);
+
+end
