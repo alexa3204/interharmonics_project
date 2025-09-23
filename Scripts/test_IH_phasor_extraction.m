@@ -349,19 +349,130 @@ end
 fprintf('Voltage Phasors:\n');
 [abs(voltage_phasor_fft) rad2deg(angle(voltage_phasor_fft))]
 
-% Line admittances
-y12 = 1/(0.01 + 1j*0.085); 
-y23 = 1/(0.02 + 1j*0.161); 
-y13 = 1/(0.01 + 1j*0.092); 
+%% Test phasor extraction on system with harmonics 
+% 60hz with current injection at 63hz 
 
-% Shunt admittances
-y12_sh = 1j*0.088; 
-y23_sh = 1j*0.153; 
-y13_sh = 1j*0.079; 
+close all; clear all; clc 
 
-% Add each shunt admittance to the corresponding bus diagonals
-Y_r = [y12 + y13 + y12_sh + y13_sh, -y12, -y13; ...
-       -y12, y12 + y23 + y12_sh + y23_sh, -y23; ...
-       -y13, -y23, y13 + y23 + y13_sh + y23_sh];
+out = sim('three_bus_current_inj_bal.slx');
 
-Y_r*voltage_phasor_fft
+fs = 20000; % sampling frequency 
+duration = 1; % test duration (s) 
+t = 0:1/fs:duration; 
+
+% Fundamental frequency
+f1 = 63;           % Hz
+omega1 = 2*pi*f1;  % rad/s
+
+% get current vectors from phase a at all buses 
+I = zeros(3, length(t)); 
+I(1,:) = out.i1_data(:,1); 
+I(2,:) = out.i2_data(:,1); 
+I(3,:) = out.i3_data(:,1); 
+
+% FFT-based frequency phasor extraction 
+N = length(I(1,:));
+f_axis = (0:N-1) * fs / N; % Frequency axis 
+
+for i = 1:3 
+    % Compute FFT 
+    I_fft(i,:) = fft(I(i,:));
+
+    [~, idx1] = min(abs(f_axis - f1)); % Index for 60Hz
+
+    % Extract phasors from FFT 
+    current_phasor_fft(i,1) = I_fft(i,idx1) * 2/N; 
+
+end 
+
+fprintf('Current Phasors:\n');
+[abs(current_phasor_fft) rad2deg(angle(current_phasor_fft))]
+
+% Voltage phasors
+V = zeros(3, length(t)); 
+V(1,:) = out.v1_data(:,1); 
+V(2,:) = out.v2_data(:,1); 
+V(3,:) = out.v3_data(:,1); 
+
+for i = 1:3 
+    V_fft(i,:) = fft(V(i,:));
+    [~, idx1] = min(abs(f_axis - f1));
+    voltage_phasor_fft(i,1) = V_fft(i,idx1) * 2/N; 
+end 
+
+fprintf('Voltage Phasors:\n');
+[abs(voltage_phasor_fft) rad2deg(angle(voltage_phasor_fft))]
+
+%% Test PMU Ybus validity  
+
+close all; clear all; clc 
+
+out = sim('PMU_three_bus_fundamental.slx');
+
+fs = 20000; % sampling frequency 
+duration = 1; % test duration (s) 
+t = 0:1/fs:duration; 
+
+% Fundamental frequency
+f1 = 60;           % Hz
+omega1 = 2*pi*f1;  % rad/s
+
+% get current vectors from phase a at all buses 
+I(1,:) = out.i1_data(end,:); 
+I(2,:) = out.i2_data(end,:); 
+I(3,:) = out.i3_data(end,:); 
+
+% get current vectors from phase a at all buses 
+V(1,:) = out.v1_data(end,:); 
+V(2,:) = out.v2_data(end,:); 
+V(3,:) = out.v3_data(end,:); 
+
+
+% convert from phasor to rectangular 
+I_c = I(:,1).*exp(j.*(deg2rad(I(:,2))));
+V_c = V(:,1).*exp(j.*(deg2rad(V(:,2))));
+
+
+%% Line admittances
+% Y-bus
+
+% Define base values
+f = 60;
+w = 2 * pi * f;
+
+v_base = 10e3;
+s_base = 100e6;
+z_base = v_base^2 / s_base;
+
+length = 1; % line length (km)
+% Initialize 3x3 Ybus
+Ybus = complex(zeros(3, 3));
+
+% Define line data (buses and R, L, C)
+% Format: [from to R L C] (value per km)
+pi_lines = [
+    1 2 0.05 0.0013528 2.8011e-05;     % line 1-2
+    1 3 0.1 0.0029285 2.5146e-05;    % line 1-3
+    2 3 0.2 0.0051248 4.8701e-05;   % line 2-3
+    ];
+
+for k = 1:size(pi_lines, 1)
+    i = pi_lines(k, 1);
+    g = pi_lines(k, 2);
+    R = pi_lines(k, 3) * length;
+    L = pi_lines(k, 4) * length;
+    C = pi_lines(k, 5) * length;
+ 
+    Z = (R + 1j * w * L)/z_base;
+    Yseries = 1 / Z;
+
+    Yshunt = 1j * w * C * z_base;
+
+    % Add to Ybus
+    Ybus(i,i) = Ybus(i,i) + Yseries + Yshunt/2;
+    Ybus(g,g) = Ybus(g,g) + Yseries + Yshunt/2;
+    Ybus(i,g) = Ybus(i,g) - Yseries;
+    Ybus(g,i) = Ybus(g,i) - Yseries;
+end
+
+Y_r = Ybus;
