@@ -327,12 +327,12 @@ for i = 1:3
     [~, idx1] = min(abs(f_axis - f1)); % Index for 60Hz
 
     % Extract phasors from FFT 
-    current_phasor_fft(i,1) = I_fft(i,idx1) * 2/N; 
+    I_r(i,1) = I_fft(i,idx1) * 2/N; 
 
 end 
 
 fprintf('Current Phasors:\n');
-[abs(current_phasor_fft) rad2deg(angle(current_phasor_fft))]
+[abs(I_r) rad2deg(angle(I_r))]
 
 % Voltage phasors
 V = zeros(3, length(t)); 
@@ -343,65 +343,12 @@ V(3,:) = out.v3_data(:,1);
 for i = 1:3 
     V_fft(i,:) = fft(V(i,:));
     [~, idx1] = min(abs(f_axis - f1));
-    voltage_phasor_fft(i,1) = V_fft(i,idx1) * 2/N; 
+    V_r(i,1) = V_fft(i,idx1) * 2/N; 
 end 
 
 fprintf('Voltage Phasors:\n');
-[abs(voltage_phasor_fft) rad2deg(angle(voltage_phasor_fft))]
+[abs(V_r) rad2deg(angle(V_r))]
 
-%% Test phasor extraction on system with harmonics 
-% 60hz with current injection at 63hz 
-
-close all; clear all; clc 
-
-out = sim('three_bus_current_inj_bal.slx');
-
-fs = 20000; % sampling frequency 
-duration = 1; % test duration (s) 
-t = 0:1/fs:duration; 
-
-% Fundamental frequency
-f1 = 63;           % Hz
-omega1 = 2*pi*f1;  % rad/s
-
-% get current vectors from phase a at all buses 
-I = zeros(3, length(t)); 
-I(1,:) = out.i1_data(:,1); 
-I(2,:) = out.i2_data(:,1); 
-I(3,:) = out.i3_data(:,1); 
-
-% FFT-based frequency phasor extraction 
-N = length(I(1,:));
-f_axis = (0:N-1) * fs / N; % Frequency axis 
-
-for i = 1:3 
-    % Compute FFT 
-    I_fft(i,:) = fft(I(i,:));
-
-    [~, idx1] = min(abs(f_axis - f1)); % Index for 60Hz
-
-    % Extract phasors from FFT 
-    current_phasor_fft(i,1) = I_fft(i,idx1) * 2/N; 
-
-end 
-
-fprintf('Current Phasors:\n');
-[abs(current_phasor_fft) rad2deg(angle(current_phasor_fft))]
-
-% Voltage phasors
-V = zeros(3, length(t)); 
-V(1,:) = out.v1_data(:,1); 
-V(2,:) = out.v2_data(:,1); 
-V(3,:) = out.v3_data(:,1); 
-
-for i = 1:3 
-    V_fft(i,:) = fft(V(i,:));
-    [~, idx1] = min(abs(f_axis - f1));
-    voltage_phasor_fft(i,1) = V_fft(i,idx1) * 2/N; 
-end 
-
-fprintf('Voltage Phasors:\n');
-[abs(voltage_phasor_fft) rad2deg(angle(voltage_phasor_fft))]
 
 %% Test PMU Ybus validity  
 
